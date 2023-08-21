@@ -1,0 +1,70 @@
+package main
+
+import (
+	"log"
+
+	"github.com/kaiquecaires/go-rabbitmq/cmd/helpers"
+	amqp "github.com/rabbitmq/amqp091-go"
+)
+
+func main() {
+	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	helpers.FailOnError(err, "Failed to connect to RabbitMQ")
+	defer conn.Close()
+
+	ch, err := conn.Channel()
+	helpers.FailOnError(err, "Failed to open a channel")
+	defer ch.Close()
+
+	err = ch.ExchangeDeclare(
+		"logs",
+		"fanout",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	helpers.FailOnError(err, "Failed to declare an exchange")
+
+	q, err := ch.QueueDeclare(
+		"",
+		false,
+		false,
+		true,
+		false,
+		nil,
+	)
+	helpers.FailOnError(err, "Failed to declare a queue")
+
+	err = ch.QueueBind(
+		q.Name,
+		"",
+		"logs",
+		false,
+		nil,
+	)
+	helpers.FailOnError(err, "Failed to bind a queue")
+
+	msgs, err := ch.Consume(
+		q.Name,
+		"",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	helpers.FailOnError(err, "Failed to register a consumer")
+
+	var forever chan struct{}
+
+	go func() {
+		for d := range msgs {
+			log.Printf(" [x] %s", d.Body)
+		}
+	}()
+
+	log.Printf(" [*] Waiting for logs. To exit press CTRL+C")
+	<-forever
+}

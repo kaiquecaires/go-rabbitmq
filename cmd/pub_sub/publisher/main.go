@@ -19,30 +19,30 @@ func main() {
 	helpers.FailOnError(err, "Failed to open a channel")
 	defer ch.Close()
 
-	q, err := ch.QueueDeclare(
-		"task_queue",
+	err = ch.ExchangeDeclare(
+		"logs",
+		"fanout",
 		true,
 		false,
 		false,
 		false,
 		nil,
 	)
-	helpers.FailOnError(err, "Failed to declare a queue")
+	helpers.FailOnError(err, "Error to declare an exchange")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	body := helpers.BodyFrom(os.Args)
 	err = ch.PublishWithContext(ctx,
+		"logs",
 		"",
-		q.Name,
 		false,
 		false,
 		amqp.Publishing{
-			DeliveryMode: amqp.Persistent,
-			ContentType:  "text/plain",
-			Body:         []byte(body),
+			ContentType: "text/plain",
+			Body:        []byte(body),
 		})
-	helpers.FailOnError(err, "Failed to publish a message")
+	helpers.FailOnError(err, "Error to publish a message")
 	log.Printf(" [x] Sent %s", body)
 }
